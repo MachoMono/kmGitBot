@@ -57,10 +57,12 @@ test('mascot: stages grow all the way to Grand Oak', () => {
 });
 
 // ---------- lessons ----------
-test('lessons: shown after the matching action, at most twice', () => {
-  assert.equal(lessons.forEvent('save', {}).word, 'commit');
-  assert.equal(lessons.forEvent('save', { commit: 1 }).id, 'commit');
-  assert.equal(lessons.forEvent('save', { commit: 2 }), null);
+test('lessons: shown after the matching action, again only a day later, at most twice', () => {
+  const now = 10 * 86400000;
+  assert.equal(lessons.forEvent('save', {}, {}, now).word, 'commit');
+  assert.equal(lessons.forEvent('save', { commit: 1 }, { commit: now - 3600000 }, now), null);
+  assert.equal(lessons.forEvent('save', { commit: 1 }, { commit: now - 90000000 }, now).id, 'commit');
+  assert.equal(lessons.forEvent('save', { commit: 2 }, {}, now), null);
   assert.equal(lessons.forEvent('nope', {}), null);
   const ids = lessons.LESSONS.map((l) => l.id);
   assert.equal(new Set(ids).size, ids.length);

@@ -76,10 +76,15 @@ const LESSONS = [
   },
 ];
 
-// Pick the lesson for an event, unless it's already been shown twice.
-function forEvent(event, seen = {}) {
+const DAY = 24 * 3600 * 1000;
+
+// Pick the lesson for an event. Spaced repetition: shown once, then once more a day or more later, then never.
+function forEvent(event, seen = {}, seenAt = {}, now = Date.now()) {
   const l = LESSONS.find((x) => x.after === event);
-  if (!l || (seen[l.id] || 0) >= 2) return null;
+  if (!l) return null;
+  const count = seen[l.id] || 0;
+  if (count >= 2) return null;
+  if (count === 1 && now - (seenAt[l.id] || 0) < DAY) return null;
   return l;
 }
 

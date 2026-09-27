@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Twig
+GenericName=Git helper
+Comment=Your friendly git buddy — saves, backs up and explains your projects
+Exec="/var/home/caleb/aiProjects/kmGitBot/scripts/twig"
+Icon=/var/home/caleb/aiProjects/kmGitBot/assets/icon.png
+Terminal=false
+Categories=Development;RevisionControl;
+Keywords=git;backup;save;claude;version;
+StartupWMClass=Twig

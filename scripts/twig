@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launches Twig (kmGitBot). Used by the desktop menu entry and autostart.
+cd "$(dirname "$(readlink -f "$0")")/.." || exit 1
+exec ./node_modules/.bin/electron . "$@"

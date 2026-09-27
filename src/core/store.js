@@ -11,7 +11,7 @@ function defaults() {
     user: { name: '', email: '', onboarded: false },
     projects: [], // { id, path, name, addedAt }
     mascot: { xp: 0, firsts: {}, saveTimes: [] },
-    lessons: { seen: {} }, // id -> times shown
+    lessons: { seen: {}, seenAt: {} }, // id -> times shown / last shown
     settings: {
       ai: true,
       autoSaveAfterClaude: false,
