@@ -13,13 +13,18 @@ function assertModel(model) {
   if (!ALLOWED.has(model)) throw new Error(`Model "${model}" is not allowed in kmGitBot (Haiku or Sonnet only)`);
 }
 
+// No built-in tools, no MCP connectors, no skills: the helper can only return text.
+// (Verified: the CLI's init event reports tools: [] and mcp_servers: [] with these flags.)
+const ARGS = (model) => ['-p', '--model', model, '--no-session-persistence', '--tools', '', '--strict-mcp-config',
+  '--mcp-config', '{"mcpServers":{}}', '--disable-slash-commands', '--output-format', 'text'];
+
 function ask(model, prompt, { bin = process.env.KMGIT_CLAUDE_BIN || 'claude', cwd, timeout = 25000 } = {}) {
   try { assertModel(model); } catch (e) { return Promise.reject(e); }
   return new Promise((resolve, reject) => {
     let out = '';
     let err = '';
     let done = false;
-    const child = spawn(bin, ['-p', '--model', model, '--no-session-persistence', '--tools', '', '--output-format', 'text'], {
+    const child = spawn(bin, ARGS(model), {
       cwd, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env },
     });
     const finish = (fn, v) => { if (!done) { done = true; clearTimeout(timer); fn(v); } };
@@ -64,4 +69,4 @@ ${String(diff).slice(0, 6000)}`;
   return (await ask(MODELS.explain, prompt, opts)).slice(0, 1200);
 }
 
-module.exports = { ask, commitMessage, explainSavePoint, cleanMessage, assertModel, MODELS, ALLOWED };
+module.exports = { ARGS, ask, commitMessage, explainSavePoint, cleanMessage, assertModel, MODELS, ALLOWED };

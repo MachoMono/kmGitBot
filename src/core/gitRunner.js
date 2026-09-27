@@ -5,13 +5,25 @@ const fs = require('fs');
 const path = require('path');
 
 // Commands the app is never allowed to run, whatever calls it.
-const FORBIDDEN = [
-  (a) => a[0] === 'reset' && a.includes('--hard'),
-  (a) => a[0] === 'push' && a.some((x) => x === '--force' || x === '-f' || x.startsWith('--force')),
+// Checked against the subcommand wherever it sits (after any leading `-c k=v` pairs).
+const has = (a, ...flags) => a.some((x) => flags.some((f) => x === f || x.startsWith(`${f}=`)));
+const FORBIDDEN_RULES = [
+  (a) => a[0] === 'reset' && has(a, '--hard', '--merge', '--keep'),
+  (a) => a[0] === 'push' && (has(a, '--force', '--force-with-lease', '--force-if-includes', '--mirror', '--delete', '-d') || a.includes('-f') || a.some((x) => x.startsWith('+'))),
   (a) => a[0] === 'clean',
-  (a) => a[0] === 'branch' && a.includes('-D'),
-  (a) => a[0] === 'checkout' && a.includes('--'),
+  (a) => a[0] === 'branch' && (a.includes('-D') || has(a, '--force') || a.includes('-f')),
+  (a) => a[0] === 'checkout' && (a.includes('--') || a.includes('-f') || has(a, '--force') || a.includes('.')),
+  (a) => a[0] === 'switch' && (a.includes('-f') || has(a, '--force', '--discard-changes') || a.includes('-C')),
+  (a) => a[0] === 'stash' && (a[1] === 'clear' || a[1] === 'drop' || a[1] === 'pop'),
+  (a) => a[0] === 'restore' && !a.some((x) => x.startsWith('--source=')),
+  (a) => a[0] === 'update-ref' || a[0] === 'filter-branch' || a[0] === 'gc' || a[0] === 'prune' || (a[0] === 'reflog' && a[1] !== 'show'),
 ];
+function subcommand(args) {
+  let i = 0;
+  while (args[i] === '-c' || args[i] === '--no-optional-locks') i += args[i] === '-c' ? 2 : 1;
+  return args.slice(i);
+}
+const FORBIDDEN = FORBIDDEN_RULES.map((rule) => (a) => rule(subcommand(a)));
 
 class GitError extends Error {
   constructor(args, code, stdout, stderr) {
@@ -80,4 +92,19 @@ function git(cwd, args, opts) {
   return serialize(cwd, () => rawGit(cwd, args, opts));
 }
 
-module.exports = { git, rawGit, serialize, safeRepoPath, GitError, FORBIDDEN };
+// Is any git process running with its working directory inside this folder? (Linux /proc)
+function gitProcessIn(root) {
+  let pids = [];
+  try { pids = fs.readdirSync('/proc').filter((x) => /^\d+$/.test(x)); } catch { return false; }
+  for (const pid of pids) {
+    try {
+      if (fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim() !== 'git') continue;
+      const cwd = fs.readlinkSync(`/proc/${pid}/cwd`);
+      const rel = path.relative(root, cwd);
+      if (rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel))) return true;
+    } catch { /* process gone or not ours */ }
+  }
+  return false;
+}
+
+module.exports = { gitProcessIn, git, rawGit, serialize, safeRepoPath, GitError, FORBIDDEN };

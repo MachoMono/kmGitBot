@@ -169,7 +169,7 @@ test('ai: passes the right flags and cleans the reply', async () => {
   assert.equal(msg, 'Update the README greeting');
   const args = fakeClaude('cat > /dev/null; echo "$@"');
   const out = await ai.ask('haiku', 'x', { bin: args });
-  assert.match(out, /-p --model haiku --no-session-persistence --tools {2}--output-format text/);
+  assert.equal(out, '-p --model haiku --no-session-persistence --tools  --strict-mcp-config --mcp-config {"mcpServers":{}} --disable-slash-commands --output-format text');
 });
 
 test('ai: missing CLI, failure and timeout all reject (caller falls back)', async () => {
@@ -181,4 +181,18 @@ test('ai: missing CLI, failure and timeout all reject (caller falls back)', asyn
 test('ai: cleanMessage trims long and quoted replies', () => {
   assert.equal(ai.cleanMessage('Commit message: `Fix typo`\n\nmore'), 'Fix typo');
   assert.equal(ai.cleanMessage('x'.repeat(100)).length, 72);
+});
+
+test('guardian: wider secret names and token shapes inside files', () => {
+  for (const f of ['.npmrc', 'home/.aws/credentials', 'config/secrets.yml', '.git-credentials', 'x/.ssh/config', 'vault.kdbx']) assert.equal(guardian.isSecretName(f), true, f);
+  const dir = tmp();
+  const files = {
+    'notes.md': 'my github token is ghp_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'config.js': 'const key = "AKIAABCDEFGHIJKLMNOP";',
+    'id.txt': '-----BEGIN OPENSSH PRIVATE KEY-----\nabc',
+    'clean.md': 'nothing secret here, just sk- talk',
+  };
+  for (const [n, t] of Object.entries(files)) fs.writeFileSync(path.join(dir, n), t);
+  const out = guardian.review(dir, Object.keys(files).map((p) => ({ path: p, kind: 'new' }))).exclude.map((x) => x.path).sort();
+  assert.deepEqual(out, ['config.js', 'id.txt', 'notes.md']);
 });

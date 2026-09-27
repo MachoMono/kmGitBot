@@ -288,3 +288,36 @@ test('repoNameFor makes a GitHub-safe name', () => {
   assert.equal(git.repoNameFor('/home/a/My Cool Project!'), 'My-Cool-Project-');
   assert.equal(git.repoNameFor('/home/a/.hidden'), 'hidden');
 });
+
+test('runner: blocks the sneakier destructive forms too', async () => {
+  const dir = repo();
+  const bad = [['checkout', '-f', 'main'], ['switch', '-f', 'main'], ['switch', '--discard-changes', 'main'], ['stash', 'clear'], ['stash', 'drop'],
+    ['reset', '--hard=x'], ['reset', '--merge'], ['push', 'origin', '+main'], ['push', '--mirror'], ['push', '--delete', 'origin', 'x'],
+    ['restore', 'README.md'], ['checkout', '.'], ['update-ref', '-d', 'HEAD'], ['reflog', 'expire', '--all'], ['gc', '--prune=now'],
+    ['-c', 'x=y', 'reset', '--hard'], ['--no-optional-locks', 'clean', '-f']];
+  for (const args of bad) await assert.rejects(rawGit(dir, args), /Refusing unsafe git command/, args.join(' '));
+  // the forms the app itself uses stay allowed
+  await rawGit(dir, ['stash', 'list']);
+  await rawGit(dir, ['switch', '-q', 'main']);
+});
+
+test('stale index.lock is left alone while a git process is running in the repo', async () => {
+  const dir = repo();
+  const lock = path.join(dir, '.git', 'index.lock');
+  fs.writeFileSync(lock, '');
+  const old = new Date(Date.now() - 20 * 60 * 1000);
+  fs.utimesSync(lock, old, old);
+  const { spawn } = require('child_process');
+  // a long-running git (waiting on stdin) with its cwd inside the repo
+  const child = spawn('git', ['hash-object', '--stdin'], { cwd: dir });
+  await new Promise((r) => setTimeout(r, 150));
+  try {
+    assert.equal((await git.status(dir)).needsHelp, null);
+    assert.deepEqual(await git.rescue(dir), { ok: true, fixed: null }); // nothing to fix, lock untouched
+    assert.equal(fs.existsSync(lock), true);
+  } finally {
+    child.stdin.end();
+    await new Promise((r) => child.on('close', r));
+  }
+  assert.equal((await git.status(dir)).needsHelp, 'lock');
+});

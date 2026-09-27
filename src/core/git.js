@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFile } = require('child_process');
-const { rawGit, serialize, GitError } = require('./gitRunner');
+const { rawGit, serialize, GitError, gitProcessIn } = require('./gitRunner');
 const guardian = require('./guardian');
 
 const FRIENDLY_GITIGNORE = `# Files Twig keeps out of your save points (you can edit this list)
@@ -111,6 +111,7 @@ async function status(dir) {
   const gd = await gitDir(dir);
   const remotes = (await rawGit(dir, ['remote'], { allowFail: true })).stdout.split('\n').filter(Boolean);
   const lock = lockInfo(gd);
+  if (lock.stale && gitProcessIn(root)) lock.stale = false; // old lock but git is still running here: not ours to take
   const progress = inProgress(gd);
   const needsHelp = st.detached ? 'detached' : progress ? progress : lock.stale ? 'lock' : null;
   return {
@@ -346,7 +347,7 @@ async function rescue(dir, { identity } = {}) {
   return withRepo(dir, async (run) => {
     const st = await status(dir);
     if (st.needsHelp === 'lock') {
-      if (!st.lock.stale) return { ok: false, reason: 'busy' };
+      if (!st.lock.stale || gitProcessIn(st.root)) return { ok: false, reason: 'busy' };
       fs.unlinkSync(path.join(await gitDir(dir), 'index.lock'));
       return { ok: true, fixed: 'lock' };
     }
