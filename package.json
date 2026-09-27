@@ -1,0 +1,18 @@
+{
+  "name": "kmgitbot",
+  "version": "1.0.0",
+  "description": "Twig — a friendly desktop helper that handles git for you and keeps an eye on your Claude sessions.",
+  "main": "src/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test \"test/unit/*.test.js\"",
+    "test:e2e": "playwright test --config test/e2e/playwright.config.js"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "electron": "^44.4.5"
+  }
+}
